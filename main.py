@@ -1,10 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from openai import OpenAI
-import os
-import logging
 import asyncio
+import logging
+from backend_config import OPENAI_API_KEY, OPENAI_MODEL, TYPING_DELAY
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -13,10 +13,7 @@ logger = logging.getLogger(__name__)
 app = FastAPI()
 
 # Set up OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-if not client.api_key:
-    logger.error("OPENAI_API_KEY environment variable is not set")
-    raise ValueError("OPENAI_API_KEY environment variable is not set")
+client = OpenAI(api_key=OPENAI_API_KEY)
 
 class Message(BaseModel):
     content: str
@@ -24,7 +21,6 @@ class Message(BaseModel):
 
 async def generate_response(message: str, history: list):
     try:
-        # Prepare the messages including the conversation history
         messages = [
             {"role": "system", "content": "You are a helpful assistant that provides information about Stripe accounts."}
         ]
@@ -32,7 +28,7 @@ async def generate_response(message: str, history: list):
         messages.append({"role": "user", "content": message})
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model=OPENAI_MODEL,
             messages=messages,
             stream=True
         )
@@ -40,7 +36,7 @@ async def generate_response(message: str, history: list):
         for chunk in response:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
-            await asyncio.sleep(0.05)  # Add a small delay to simulate typing
+            await asyncio.sleep(TYPING_DELAY)
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         yield f"An error occurred: {str(e)}"
